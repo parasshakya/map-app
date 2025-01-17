@@ -39,8 +39,8 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void initState() {
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      _initializeLocation();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
+      await _initializeLocation();
     });
     super.initState();
   }
@@ -65,6 +65,7 @@ class _MapScreenState extends State<MapScreen> {
           setState(() {
             _currentLocation =
                 LatLng(locationData.latitude!, locationData.longitude!);
+            _fetchRoute();
           });
         }
       });
@@ -85,9 +86,10 @@ class _MapScreenState extends State<MapScreen> {
     }
     PermissionStatus permissionGranted = await _locationService.hasPermission();
     if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted == await _locationService.requestPermission();
-      if (permissionGranted != PermissionStatus.granted ||
-          permissionGranted != PermissionStatus.grantedLimited) return false;
+      permissionGranted = await _locationService.requestPermission();
+      if (permissionGranted != PermissionStatus.granted) {
+        return false;
+      }
     }
     return true;
   }
