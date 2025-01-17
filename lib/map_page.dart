@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
-// import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
 import 'package:http/http.dart' as http;
@@ -30,6 +31,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Location _locationService = Location();
   final TextEditingController _locationController = TextEditingController();
+  late Timer _locationUpdateTimer;
 
   bool _isLoading = true;
   LatLng? _currentLocation;
@@ -59,20 +61,48 @@ class _MapScreenState extends State<MapScreen> {
         });
       }
 
-      // Listen for continuous location updates
-      _locationService.onLocationChanged.listen((locationData) {
-        if (locationData.latitude != null && locationData.longitude != null) {
-          setState(() {
-            _currentLocation =
-                LatLng(locationData.latitude!, locationData.longitude!);
-            _fetchRoute();
-          });
-        }
+      // Start periodic location update every 10 seconds
+      _locationUpdateTimer =
+          Timer.periodic(const Duration(seconds: 5), (timer) {
+        generateNearbyLocation(); // Simulate new location update
       });
+
+      // Listen for continuous location updates
+      // _locationService.onLocationChanged.listen((locationData) {
+      //   if (locationData.latitude != null && locationData.longitude != null) {
+      //     setState(() {
+      //       _currentLocation =
+      //           LatLng(locationData.latitude!, locationData.longitude!);
+      //       _fetchRoute();
+      //     });
+      //   }
+      // });
     } catch (e) {
       _showError("Failed to get location: $e");
       setState(() {
         _isLoading = false; // Stop loading to avoid indefinite spinner
+      });
+    }
+  }
+
+  // Timer to generate new location and check if it's nearby
+  void generateNearbyLocation() async {
+    // Starting the timer to update location every 10 seconds
+    if (_currentLocation != null) {
+      // Generate a new nearby location by adding small random offsets
+      final random = Random();
+      final latOffset = (random.nextDouble() - 0.5) * 0.01; // small offset
+      final lonOffset = (random.nextDouble() - 0.5) * 0.01; // small offset
+
+      // New location near current location
+      final newLat = _currentLocation!.latitude + latOffset;
+      final newLon = _currentLocation!.longitude + lonOffset;
+      final newLocation = LatLng(newLat, newLon);
+
+      setState(() {
+        _currentLocation = newLocation;
+        print("currentLocation changed");
+        _fetchRoute(); // Optional: re-fetch the route if needed
       });
     }
   }
@@ -183,6 +213,12 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   @override
+  void dispose() {
+    _locationUpdateTimer.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -237,20 +273,35 @@ class _MapScreenState extends State<MapScreen> {
                               "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
                         ),
                         // User's current location marker
-                        CurrentLocationLayer(
-                          alignPositionOnUpdate: AlignOnUpdate.never,
-                          alignDirectionOnUpdate: AlignOnUpdate.never,
-                          style: const LocationMarkerStyle(
-                            marker: DefaultLocationMarker(
-                              child: Icon(
-                                Icons.navigation,
-                                color: Colors.white,
+                        if (_currentLocation != null)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _currentLocation!,
+                                width: 50,
+                                height: 50,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.blue,
+                                  size: 40,
+                                ),
                               ),
-                            ),
-                            markerSize: Size(40, 40),
-                            markerDirection: MarkerDirection.heading,
+                            ],
                           ),
-                        ),
+                        // CurrentLocationLayer(
+                        //   alignPositionOnUpdate: AlignOnUpdate.never,
+                        //   alignDirectionOnUpdate: AlignOnUpdate.never,
+                        //   style: const LocationMarkerStyle(
+                        //     marker: DefaultLocationMarker(
+                        //       child: Icon(
+                        //         Icons.navigation,
+                        //         color: Colors.white,
+                        //       ),
+                        //     ),
+                        //     markerSize: Size(40, 40),
+                        //     markerDirection: MarkerDirection.heading,
+                        //   ),
+                        // ),
                         // Destination marker
                         if (_destination != null)
                           MarkerLayer(
